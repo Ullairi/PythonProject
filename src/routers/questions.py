@@ -12,9 +12,6 @@ from src.core.db import db
 questions_bp = Blueprint("questions", __name__, url_prefix='/questions')
 
 
-# CRUD (Questions)
-
-# R
 def list_of_questions():
     polls = db.session.query(Poll).all()
     result = [
@@ -28,7 +25,7 @@ def list_of_questions():
     return jsonify(result), 200
 
 
-# C
+# post endpoint
 @questions_bp.route('/create', methods=["POST"])
 def create_new_question():
     try:
@@ -107,8 +104,7 @@ def create_new_question():
             }
         ), 500
 
-
-# R
+# get endpoint
 @questions_bp.route('/<int:question_id>', methods=["GET"])
 def get_question_by_id(question_id: int) -> dict[str, Any]:
     return {
@@ -117,13 +113,13 @@ def get_question_by_id(question_id: int) -> dict[str, Any]:
     }
 
 
-# U
+# put endpoint
 @questions_bp.route('/<int:question_id>/update', methods=["PUT", "PATCH"])
 def update_question(question_id: int) -> str:
     return f"Question with ID {question_id} was updated. Congrats!"
 
 
-# D
+# Delete endpoint
 @questions_bp.route('/<int:question_id>/delete', methods=["DELETE"])
 def delete_question(question_id: int) -> str:
     return f"Question with ID {question_id} was deleted successfully. Congrats!"
