@@ -15,18 +15,17 @@ questions_bp = Blueprint("questions", __name__, url_prefix='/questions')
 # CRUD (Questions)
 
 # R
-@questions_bp.route('', methods=["GET"])
-def list_of_questions() -> list[dict[str, Any]]:
-    return [
+def list_of_questions():
+    polls = db.session.query(Poll).all()
+    result = [
         {
-            "id": 1,
-            "title": "На сколько вы в шоке?"
-        },
-        {
-            "id": 2,
-            "title": "Вы точно в порядке?"
+            "id": p.id,
+            "title": p.title,
+            "category": {"id": p.category.id, "name": p.category.name}
         }
+        for p in polls
     ]
+    return jsonify(result), 200
 
 
 # C
@@ -39,16 +38,30 @@ def create_new_question():
             return jsonify(
                 {
                     "error": "Validation Error",
-                    "message": "Сырых даных не обнаружено"
+                    "message": "Сырых данных не обнаружено"
                 }
             ), 400  # BAD REQUEST
 
         poll_data = PollCreateRequest.model_validate(raw_data)
 
+        category_id = getattr(poll_data, "category_id", None)
+        if not category_id:
+            return jsonify(
+                {"error": "Validation Error", "message": "category_id обязателен"}
+            ), 400
+
+        from src.models import Category
+        category = db.session.get(Category, category_id)
+        if not category:
+            return jsonify(
+                {"error": "Not Found", "message": f"Категория с id={category_id} не найдена"}
+            ), 404
+
         options_data = poll_data.options
         poll_dict: dict[str, Any] = poll_data.model_dump(exclude={'options'})
-
         poll: Poll = Poll(**poll_dict)
+
+        poll.category = category
 
         db.session.add(poll)
         db.session.flush()
@@ -58,11 +71,9 @@ def create_new_question():
                 poll_id=poll.id,
                 text=opt.text
             )
-
             poll.options.append(option)
 
         db.session.commit()
-
         db.session.refresh(poll)
 
         poll_response: dict[str, Any] = (
@@ -71,9 +82,7 @@ def create_new_question():
             .model_dump()
         )
 
-        return jsonify(
-            poll_response
-        ), 201
+        return jsonify(poll_response), 201
 
     except ValidationError as exc:
         return jsonify(
@@ -81,7 +90,7 @@ def create_new_question():
                 "error": "Validation Error",
                 "message": exc.errors()
             }
-        ), 400  # BAD REQUEST
+        ), 400
     except SQLAlchemyError as exc:
         db.session.rollback()
         return jsonify(
@@ -89,14 +98,14 @@ def create_new_question():
                 "error": "DATABASE Error",
                 "message": str(exc)
             }
-        ), 400  # BAD REQUEST
+        ), 400
     except Exception as exc:
         return jsonify(
             {
                 "error": "Unexpected Error",
                 "message": str(exc)
             }
-        ), 500  # BAD REQUEST
+        ), 500
 
 
 # R
